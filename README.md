@@ -69,6 +69,8 @@ Resumo:
 
 3. **Start:** `npm start` (o script `prestart` roda `prisma migrate deploy` de novo na subida, útil se o painel tiver pulado migrations no build).
 
+4. Se o log mostrar **`uv_thread_create`** / **`WorkerThreadsTaskRunner`**, o Node não consegue criar threads no servidor (comum em **hospedagem compartilhada** com Node “Alt”). Use **VPS** ou o produto **Node Web App** da Hostinger — ver a **seção 10** em [DEPLOY-HOSTINGER.md](./DEPLOY-HOSTINGER.md).
+
 ## Notas
 
 - `/.env*` é ignorado pelo git por padrão (veja `.gitignore`).

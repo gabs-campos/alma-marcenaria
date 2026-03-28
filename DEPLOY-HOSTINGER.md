@@ -163,3 +163,41 @@ O script `postinstall` roda `prisma generate` após `npm ci` (útil em deploy).
 | `A tabela main.Product não existe` | Migrations **nunca** rodaram no `prod.db` (build só com `next build`) | Defina build como `npm run build:deploy` e start como **`npm start`**; faça redeploy. O `prestart` aplica `prisma migrate deploy` automaticamente. |
 | Login admin não grava cookie | Sem HTTPS em produção | Ative SSL no domínio; `NEXT_PUBLIC_SITE_URL` com `https://` |
 | Upload imagem falha | R2: chaves trocadas ou secret truncado | Gere novo token R2 e copie Access Key + Secret completos |
+| `uv_thread_create` / `WorkerThreadsTaskRunner` / assertion em `node_platform.cc` | Node **não consegue criar threads** no servidor (limite de processo/thread do **hospedagem compartilhada** / CloudLinux `alt-nodejs`) | Ver seção **10** abaixo |
+
+---
+
+## 10. Erro nativo do Node: `uv_thread_create` / `WorkerThreadsTaskRunner`
+
+Se o log mostra algo como:
+
+```text
+Assertion failed: (0) == (uv_thread_create(t.get(), start_thread, this))
+node::WorkerThreadsTaskRunner::DelayedTaskScheduler::Start()
+```
+
+e o binário é algo como `/opt/alt/alt-nodejs20/root/bin/node`, isso **não é um bug do Next.js** nem do seu código: o **runtime Node falha ao subir** porque o ambiente (muito comum em **cPanel / hospedagem compartilhada** com Node opcional) **bloqueia ou limita** a criação de threads que o Node precisa para inicializar o V8.
+
+### O que fazer
+
+1. **Confirmar o produto**  
+   Este projeto precisa de Node com threads normais. Se você estiver em **hospedagem compartilhada “com Node”** (Alt Node), pode ser **incompatível** com Next.js 16 em produção.
+
+2. **Na Hostinger, prefira um destes caminhos**  
+   - **Aplicação Node / Web App** do painel (ambiente pensado para apps Node), **ou**  
+   - **VPS** com Ubuntu + Node instalado via **NodeSource/nvm** (binário oficial), Nginx e PM2 — ver trilha B neste guia.
+
+3. **Tentativas rápidas no painel atual** (às vezes ajudam, às vezes não)  
+   - Trocar a versão do Node (**18.x** em vez de 20.x, ou o contrário), salvar e redeploy.  
+   - Garantir **um único** processo de start (sem várias réplicas / cluster).  
+   - Garantir comando de produção: **`npm start`** com `NODE_ENV=production`, **não** `next dev`.
+
+4. **Suporte Hostinger**  
+   Abra um ticket anexando o trecho do stderr; pergunte se o plano permite **pthread / worker threads** para Node ou se recomendam **VPS / Node Web App** para Next.js.
+
+### O que **não** resolve na maioria dos casos
+
+- Mudar só `package.json` ou variáveis do Next — o crash ocorre **antes** da aplicação carregar.  
+- “Otimizar” o build: o problema é o **processo Node** no servidor, não o tamanho do bundle.
+
+Se após migrar para **VPS** ou **Node Web App** adequado o mesmo comando (`npm start`) funcionar localmente e em outro provedor, isso confirma limitação do ambiente antigo.
