@@ -1,0 +1,26 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum ProductCategory {
+  MOVEIS
+  DECORACAO
+  MATERIAIS
+}
+
+model Product {
+  id          Int             @id @default(autoincrement())
+  name        String
+  description String
+  priceCents  Int
+  category    ProductCategory
+  imageUrl    String?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+}
+
