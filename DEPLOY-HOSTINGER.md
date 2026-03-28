@@ -1,0 +1,165 @@
+# Deploy na Hostinger — Alma Marcenaria
+
+Este app é **Next.js 16** com SSR, **API Routes**, **Prisma + SQLite** e **Cloudflare R2**. É necessário **Node.js em execução contínua** (não basta hospedagem PHP estática).
+
+Documentação Next.js: [Deploying](https://nextjs.org/docs/app/getting-started/deploying) e [output: standalone](https://nextjs.org/docs/app/api-reference/config/next-config-js/output).
+
+Guia Hostinger (Node gerenciado): [How to add a Node.js Web App](https://www.hostinger.com/support/how-to-deploy-a-nodejs-website-in-hostinger/).  
+Repositório de referência: [hostinger/deploy-nextjs](https://github.com/hostinger/deploy-nextjs).
+
+---
+
+## 1. Escolha o tipo de hospedagem
+
+| Trilha | Quando usar |
+|--------|-------------|
+| **A — Node.js Web App** | Seu plano Hostinger inclui deploy de aplicação **Node** a partir do **Git** (ex.: Cloud/Business, conforme a oferta atual). |
+| **B — VPS** | Você tem **VPS KVM** com Ubuntu (ou similar) e vai instalar Node, Nginx e PM2 manualmente. |
+| **Não serve** | Hospedagem **só PHP** sem Node — este projeto não roda aí sem mudar de produto ou de provedor. |
+
+---
+
+## 2. Variáveis de ambiente (produção)
+
+Copie [`.env.example`](.env.example) para `.env` no servidor **ou** configure as mesmas chaves no painel da Hostinger. **Nunca commite o `.env`.**
+
+| Variável | Observação |
+|----------|------------|
+| `DATABASE_URL` | Ver seção SQLite abaixo. |
+| `NEXT_PUBLIC_SITE_URL` | URL pública com **`https://`** (ex.: `https://www.sua-loja.com.br`). |
+| `ADMIN_USERNAME` / `ADMIN_PASSWORD` | Troque valores padrão. |
+| `ADMIN_API_TOKEN` | Opcional; se preenchido, APIs admin também aceitam `Authorization: Bearer …`. |
+| `R2_*` | Mesmas chaves do ambiente local; `R2_PUBLIC_BASE_URL` pode ficar vazio (imagens via `/api/storage/...`). |
+
+O cookie do admin usa `Secure` em produção; **HTTPS é obrigatório** para o login funcionar de forma confiável.
+
+---
+
+## 3. SQLite em produção
+
+O Prisma resolve caminhos **relativos** no `DATABASE_URL` em relação à pasta **`prisma/`** (onde está `schema.prisma`). Ex.: `file:./prod.db` → arquivo `prisma/prod.db` dentro do projeto.
+
+### Hostinger Node Web App (deploy Git — pasta `nodejs/`)
+
+O app costuma rodar em um caminho como:
+
+`/home/SEU_USER/domains/SEU_SUBDOMINIO.hostingersite.com/nodejs/`
+
+**Erro comum — SQLite código 14 (“não foi possível abrir o arquivo”):** usar no painel um `DATABASE_URL` copiado de tutorial de **VPS**, por exemplo `file:/var/www/alma-marcenaria/prisma/prod.db`. Nesse ambiente **esse diretório não existe**, então o Prisma falha ao abrir o banco.
+
+**Correção:** no painel de variáveis de ambiente, defina:
+
+```text
+DATABASE_URL=file:./prod.db
+```
+
+(Ou outro nome, desde que seja **relativo à pasta `prisma/`**, sem `prisma/` duplicado no valor — **não** use `file:./prisma/prod.db`, senão o arquivo seria `prisma/prisma/prod.db`.)
+
+O build (`prisma migrate deploy` no `build:deploy`) cria `prisma/prod.db` no próprio projeto, desde que o processo tenha permissão de escrita na pasta `prisma/`.
+
+### VPS próprio (ex.: `/var/www/...`)
+
+Aí sim faz sentido caminho absoluto real no disco, por exemplo:
+
+`DATABASE_URL=file:/var/www/alma-marcenaria/prisma/prod.db`
+
+### Geral
+
+- Garanta permissão de leitura/escrita no arquivo e na pasta `prisma/`.
+- Faça **backup** periódico do `.db`.
+- Se o painel **apagar o disco** a cada deploy, o SQLite some — avalie MySQL/PostgreSQL no painel e migração do Prisma.
+
+---
+
+## 4. Pipeline de build (comum)
+
+Na **primeira vez** e após puxar código novo:
+
+```bash
+npm ci
+```
+
+**Build completo para produção** (gera client Prisma, aplica migrations, build Next e copia assets para `standalone`):
+
+```bash
+npm run build:deploy
+```
+
+Requer `DATABASE_URL` válido **durante o build** (o `prisma migrate deploy` precisa do banco).
+
+**Subir o app:**
+
+- Modo clássico (após `npm run build` ou `build:deploy`):
+
+  ```bash
+  npm run start
+  ```
+
+  Na Hostinger, se a plataforma definir `PORT`, use algo como: `npm run start -- -p $PORT` (se o painel injetar a variável).
+
+- Modo **standalone** (imagem menor; após `build:deploy`):
+
+  ```bash
+  npm run start:standalone
+  ```
+
+  Defina `PORT` e `HOSTNAME=0.0.0.0` se necessário (VPS atrás do Nginx).
+
+O script `postinstall` roda `prisma generate` após `npm ci` (útil em deploy).
+
+---
+
+## 5. Trilha A — Node.js Web App (painel)
+
+1. Conecte o repositório GitHub (branch `main`).
+2. **Node:** 20.x LTS (ou versão oferecida e compatível com Next 16).
+3. **`DATABASE_URL`:** use `file:./prod.db` (ver seção 3). **Não** use `file:/var/www/...` a menos que esse seja literalmente o caminho do app no servidor.
+4. **Install:** `npm ci`
+5. **Build:** use **`npm run build:deploy`** (gera o client Prisma, aplica **migrations** e faz o build do Next).  
+   Se o painel só tiver um campo e hoje estiver `npm run build`, troque para `npm run build:deploy`.  
+   Só `next build` **não** cria as tabelas no SQLite — daí o erro *“A tabela `main.Product` não existe”*.
+6. **Start:** use **`npm start`** (com **npm**, não só `next start`). O projeto define `prestart` → `prisma migrate deploy`, que aplica migrations na subida caso o build tenha pulado esse passo.
+7. Confirme se há **armazenamento persistente** para o arquivo SQLite entre deploys.
+
+### Cloudflare R2 no painel
+
+`R2_ACCESS_KEY_ID` e `R2_SECRET_ACCESS_KEY` vêm do painel **R2 → Manage R2 API Tokens**. O **Secret** costuma ser a string longa mostrada **uma vez**; o **Access Key ID** é outro valor — não inverta os dois.
+
+---
+
+## 6. Trilha B — VPS (Nginx + PM2)
+
+1. Instale **Node.js 20**, **Nginx**, **PM2**, **Certbot** (SSL).
+2. Clone o repositório (ex.: `/var/www/alma-marcenaria`), crie `.env` no servidor.
+3. `npm ci && npm run build:deploy`
+4. Exemplo de proxy: [`deploy/nginx-alma-marcenaria.example.conf`](deploy/nginx-alma-marcenaria.example.conf) — ajuste `server_name` e SSL. Os headers **`X-Forwarded-Proto`** e **`Host`** são importantes para o Next.js e cookies em HTTPS.
+5. PM2: ajuste `cwd` em [`deploy/ecosystem.config.cjs`](deploy/ecosystem.config.cjs) e rode `pm2 start deploy/ecosystem.config.cjs`, depois `pm2 save` e `pm2 startup`.
+6. Firewall: libere **80** e **443**; não exponha a porta do Node publicamente se usar só o Nginx.
+
+---
+
+## 7. Checklist pós-deploy (smoke test)
+
+- [ ] Home e `/loja` carregam com **HTTPS**.
+- [ ] `/admin/login` abre; login funciona (cookie em HTTPS).
+- [ ] Criar/editar produto no admin.
+- [ ] Upload de imagem (R2) e visualização na loja e em `/api/storage/...` se aplicável.
+- [ ] Carrinho e checkout (fluxo básico).
+- [ ] `robots.txt` e `sitemap.xml` coerentes com `NEXT_PUBLIC_SITE_URL`.
+
+---
+
+## 8. Riscos
+
+- Plano **sem Node**: inviável sem upgrade ou outro provedor.
+- **SQLite** + deploy sem persistência: perda de dados.
+- **Segredos**: rotacione chaves R2 e senhas se vazaram em desenvolvimento.
+
+## 9. Troubleshooting
+
+| Sintoma | Causa provável | Ação |
+|--------|----------------|------|
+| `Código de erro 14` / não abre o arquivo do banco | `DATABASE_URL` aponta para pasta que **não existe** (ex.: `/var/www/...` na Hostinger Node) | Use `DATABASE_URL=file:./prod.db` e redeploy com `build:deploy` |
+| `A tabela main.Product não existe` | Migrations **nunca** rodaram no `prod.db` (build só com `next build`) | Defina build como `npm run build:deploy` e start como **`npm start`**; faça redeploy. O `prestart` aplica `prisma migrate deploy` automaticamente. |
+| Login admin não grava cookie | Sem HTTPS em produção | Ative SSL no domínio; `NEXT_PUBLIC_SITE_URL` com `https://` |
+| Upload imagem falha | R2: chaves trocadas ou secret truncado | Gere novo token R2 e copie Access Key + Secret completos |

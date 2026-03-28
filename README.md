@@ -59,30 +59,15 @@ As rotas de escrita do CRUD de produtos (`POST/PATCH/DELETE`) exigem autenticaç
 
 ## Deploy na Hostinger (Node)
 
-1) Configure variáveis de ambiente no painel:
-- `DATABASE_URL` = `file:./dev.db` (SQLite local)
-- `ADMIN_USERNAME`, `ADMIN_PASSWORD`
-- `NEXT_PUBLIC_SITE_URL` = URL pública do site
+Guia detalhado: [DEPLOY-HOSTINGER.md](./DEPLOY-HOSTINGER.md).
 
-2) Build:
+Resumo:
 
-```bash
-npm ci
-npm run build
-```
+1. Variáveis no painel: `DATABASE_URL=file:./prod.db` (produção na Hostinger), `NEXT_PUBLIC_SITE_URL` com `https://`, admin e R2 — ver [`.env.example`](./.env.example).
 
-3) Rodar migrations em produção:
+2. **Build:** `npm run build:deploy` (inclui `prisma migrate deploy` + `next build`). Só `npm run build` deixa o SQLite sem tabelas.
 
-```bash
-npx prisma migrate deploy
-npx prisma generate
-```
-
-4) Start:
-
-```bash
-npm run start
-```
+3. **Start:** `npm start` (o script `prestart` roda `prisma migrate deploy` de novo na subida, útil se o painel tiver pulado migrations no build).
 
 ## Notas
 
