@@ -5,7 +5,7 @@ Este app é **Next.js 16** com SSR, **API Routes**, **Prisma + SQLite** e **Clou
 Documentação Next.js: [Deploying](https://nextjs.org/docs/app/getting-started/deploying) e [output: standalone](https://nextjs.org/docs/app/api-reference/config/next-config-js/output).
 
 Guia Hostinger (Node gerenciado): [How to add a Node.js Web App](https://www.hostinger.com/support/how-to-deploy-a-nodejs-website-in-hostinger/).  
-Repositório de referência: [hostinger/deploy-nextjs](https://github.com/hostinger/deploy-nextjs).
+Repositório de referência da Hostinger para Next.js: [hostinger/deploy-nextjs](https://github.com/hostinger/deploy-nextjs) — lá o **Start** recomendado é **`npm run start -- -p $PORT`** (porta alinhada ao proxy; sem isso é comum **503**).
 
 ---
 
@@ -55,7 +55,7 @@ DATABASE_URL=file:./prod.db
 
 (Ou outro nome, desde que seja **relativo à pasta `prisma/`**, sem `prisma/` duplicado no valor — **não** use `file:./prisma/prod.db`, senão o arquivo seria `prisma/prisma/prod.db`.)
 
-O build (`prisma migrate deploy` no `build:deploy`) cria `prisma/prod.db` no próprio projeto, desde que o processo tenha permissão de escrita na pasta `prisma/`.
+O build (`npm run build`, com `prisma migrate deploy`) cria `prisma/prod.db` no próprio projeto, desde que o processo tenha permissão de escrita na pasta `prisma/`.
 
 ### VPS próprio (ex.: `/var/www/...`)
 
@@ -79,25 +79,27 @@ Na **primeira vez** e após puxar código novo:
 npm ci
 ```
 
-**Build completo para produção** (gera client Prisma, aplica migrations, build Next e copia assets para `standalone`):
+**Build completo para produção** (gera client Prisma, aplica migrations, build Next):
 
 ```bash
-npm run build:deploy
+npm run build
 ```
+
+(`npm run build:deploy` é alias do mesmo comando.)
 
 Requer `DATABASE_URL` válido **durante o build** (o `prisma migrate deploy` precisa do banco).
 
 **Subir o app:**
 
-- Modo clássico (após `npm run build` ou `build:deploy`):
+- Modo clássico (após `npm run build`):
 
   ```bash
   npm run start
   ```
 
-  Na Hostinger, se a plataforma definir `PORT`, use algo como: `npm run start -- -p $PORT` (se o painel injetar a variável).
+  Na Hostinger (Node Web App), defina o comando de start no painel como **`npm run start -- -p $PORT`** (ver seção 5).
 
-- Modo **standalone** (imagem menor; após `build:deploy`):
+- Modo **standalone** (imagem menor; após `npm run build`):
 
   ```bash
   npm run start:standalone
@@ -105,7 +107,7 @@ Requer `DATABASE_URL` válido **durante o build** (o `prisma migrate deploy` pre
 
   Defina `PORT` e `HOSTNAME=0.0.0.0` se necessário (VPS atrás do Nginx).
 
-O `postinstall` roda **apenas** `prisma generate` após `npm ci` (leve). **Não** rode `next build` no `postinstall`: o painel já executa o comando de build; duplicar o build aumenta tempo, memória e risco de falha. As **migrations** ficam no **`npm run build:deploy`** (ou equivalente no build), **não** no `npm start` — ver seção 5 sobre **503**.
+O `postinstall` roda **apenas** `prisma generate` após `npm ci` (leve). **Não** rode `next build` no `postinstall`: o painel já executa o comando de build. As **migrations** rodam no **`npm run build`** (script completo no `package.json`), **não** no `npm start` — ver seção 5 sobre **503**.
 
 ---
 
@@ -115,10 +117,13 @@ O `postinstall` roda **apenas** `prisma generate` após `npm ci` (leve). **Não*
 2. **Node:** 20.x LTS (ou versão oferecida e compatível com Next 16).
 3. **`DATABASE_URL`:** use `file:./prod.db` (ver seção 3). **Não** use `file:/var/www/...` a menos que esse seja literalmente o caminho do app no servidor.
 4. **Install:** `npm ci`
-5. **Build:** use **`npm run build:deploy`** (gera o client Prisma, aplica **migrations** e faz o build do Next).  
-   Se o painel só tiver um campo e hoje estiver `npm run build`, troque para `npm run build:deploy`.  
-   Só `next build` **não** cria as tabelas no SQLite — daí o erro *“A tabela `main.Product` não existe”*.
-6. **Start:** use **`npm start`**. Não use `prestart` com `prisma migrate deploy` neste projeto: em vários painéis as variáveis de ambiente (**`DATABASE_URL`**) existem só na fase de **build**, não na de **execução**. Se o Prisma rodar no start sem `DATABASE_URL`, o comando falha, o Next **não sobe** e o proxy responde **503**. As migrations devem ser aplicadas no **build** (`build:deploy`).
+5. **Build:** o preset **Next.js** da Hostinger costuma **fixar** o comando em **`npm run build`** (sem campo editável). Neste repositório, o script **`build`** no `package.json` já inclui **`prisma generate`**, **`prisma migrate deploy`** e **`next build`**, então **não é obrigatório** mudar o comando no painel.  
+   Se em outro ambiente você precisar só do Next sem rodar migrations, use **`npm run build:next`**.
+6. **Start (Hostinger — importante):** no campo **Start command** do painel, use exatamente o que a Hostinger documenta para Next.js:  
+   **`npm run start -- -p $PORT`**  
+   ([referência](https://github.com/hostinger/deploy-nextjs/blob/main/README.md)). Só **`npm start`** costuma subir na porta **3000**; se o proxy da plataforma espera a porta em **`$PORT`**, o site fica **503** e o log de “execução” pode mostrar só o **build**, sem linhas do `next start`.  
+   Localmente continue usando `npm start` ou `PORT=3000 npm start` como preferir.  
+   Não use `prestart` com `prisma migrate deploy`: migrations ficam no **`npm run build`** (pipeline padrão). Se o Prisma rodar no start sem `DATABASE_URL` no runtime, o processo pode abortar antes do Next — outra causa de **503**.
 7. Confirme se há **armazenamento persistente** para o arquivo SQLite entre deploys.
 8. No painel, se existir opção **“variáveis de ambiente em runtime”** / **produção**, replique **`DATABASE_URL`** (e as demais) para o processo que roda `npm start`, não só para o build.
 
@@ -132,7 +137,7 @@ O `postinstall` roda **apenas** `prisma generate` após `npm ci` (leve). **Não*
 
 1. Instale **Node.js 20**, **Nginx**, **PM2**, **Certbot** (SSL).
 2. Clone o repositório (ex.: `/var/www/alma-marcenaria`), crie `.env` no servidor.
-3. `npm ci && npm run build:deploy`
+3. `npm ci && npm run build`
 4. Exemplo de proxy: [`deploy/nginx-alma-marcenaria.example.conf`](deploy/nginx-alma-marcenaria.example.conf) — ajuste `server_name` e SSL. Os headers **`X-Forwarded-Proto`** e **`Host`** são importantes para o Next.js e cookies em HTTPS.
 5. PM2: ajuste `cwd` em [`deploy/ecosystem.config.cjs`](deploy/ecosystem.config.cjs) e rode `pm2 start deploy/ecosystem.config.cjs`, depois `pm2 save` e `pm2 startup`.
 6. Firewall: libere **80** e **443**; não exponha a porta do Node publicamente se usar só o Nginx.
@@ -160,9 +165,9 @@ O `postinstall` roda **apenas** `prisma generate` após `npm ci` (leve). **Não*
 
 | Sintoma | Causa provável | Ação |
 |--------|----------------|------|
-| `Código de erro 14` / não abre o arquivo do banco | `DATABASE_URL` aponta para pasta que **não existe** (ex.: `/var/www/...` na Hostinger Node) | Use `DATABASE_URL=file:./prod.db` e redeploy com `build:deploy` |
-| `A tabela main.Product não existe` | Migrations **nunca** rodaram no `prod.db` (build só com `next build`) | Defina build como **`npm run build:deploy`** e redeploy. |
-| **503** / site fora / sem logs de “app” | **`npm start` não chega a subir o Next** — ex.: `prestart` ou script que roda Prisma **sem** `DATABASE_URL` no runtime; ou processo morre ao iniciar | Use **`npm start`** sem hook que exija DB no start; migrations só no **build**. Garanta `DATABASE_URL` (e demais envs) também na fase **runtime**, se o painel separar build de execução. |
+| `Código de erro 14` / não abre o arquivo do banco | `DATABASE_URL` aponta para pasta que **não existe** (ex.: `/var/www/...` na Hostinger Node) | Use `DATABASE_URL=file:./prod.db` e redeploy com **`npm run build`**. |
+| `A tabela main.Product não existe` | Migrations **nunca** rodaram no `prod.db` (ex.: build antigo só com `next build`) | Redeploy com o `package.json` atual: **`npm run build`** já inclui `prisma migrate deploy`. Ou rode `npm run build:next` só se souber que o banco já está migrado. |
+| **503** / site fora / log só com **build** | **Porta errada** (Next na 3000, proxy em `$PORT`) **ou** processo não sobe (Prisma no start sem env, crash nativo do Node) | **Start no painel:** `npm run start -- -p $PORT` ([deploy-nextjs](https://github.com/hostinger/deploy-nextjs)). **Build:** deixe o padrão **`npm run build`**. Garanta `DATABASE_URL` no **runtime** se o painel separar build/execução. |
 | Login admin não grava cookie | Sem HTTPS em produção | Ative SSL no domínio; `NEXT_PUBLIC_SITE_URL` com `https://` |
 | Upload imagem falha | R2: chaves trocadas ou secret truncado | Gere novo token R2 e copie Access Key + Secret completos |
 | `uv_thread_create` / `WorkerThreadsTaskRunner` / assertion em `node_platform.cc` | Node **não consegue criar threads** no servidor (limite de processo/thread do **hospedagem compartilhada** / CloudLinux `alt-nodejs`) | Ver seção **10** abaixo |
@@ -219,14 +224,14 @@ Depende do painel: muitos só mostram **build**, não o **runtime** do `npm star
 
 1. **`NEXT_PUBLIC_SITE_URL` inválida** — vazia, sem `https://`, ou URL malformada. O layout usa isso em `metadataBase`; valor inválido derruba **todas** as páginas. Use exatamente: `https://mintcream-spoonbill-882631.hostingersite.com` (ajuste ao seu subdomínio).
 
-2. **Prisma / SQLite** — `DATABASE_URL=file:./prod.db`, build com `npm run build:deploy` (migrations), `npm start` com `prestart`. Se o banco não existir ou a tabela não existir, a **home** (`/`) quebra ao listar produtos.
+2. **Prisma / SQLite** — `DATABASE_URL=file:./prod.db`, build com **`npm run build`** (inclui migrations). Se o banco não existir ou a tabela não existir, a **home** (`/`) quebra ao listar produtos.
 
 3. **Variáveis de ambiente** — confira no painel todas as chaves de [`.env.example`](.env.example); falta de `DATABASE_URL` em runtime também quebra o Prisma.
 
 ### Como depurar
 
 1. No painel Hostinger, abra **tudo** que se chame log (app, Node, deployment, stderr).
-2. Rode localmente com as **mesmas** variáveis de produção: `npm run build:deploy && NODE_ENV=production npm start` e abra a home.
+2. Rode localmente com as **mesmas** variáveis de produção: `npm run build && NODE_ENV=production npm start` e abra a home.
 3. Garanta que o código no Git inclui correções recentes (ex.: `searchParams` assíncrono em `/admin/login`, `metadataBase` tolerante a URL inválida).
 
 Se mesmo assim não houver log, abra ticket na Hostinger pedindo **onde ver stderr do processo Node** em “Node.js Web App”.

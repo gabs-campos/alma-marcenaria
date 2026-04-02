@@ -65,9 +65,9 @@ Resumo:
 
 1. Variáveis no painel: `DATABASE_URL=file:./prod.db` (produção na Hostinger), `NEXT_PUBLIC_SITE_URL` com `https://`, admin e R2 — ver [`.env.example`](./.env.example).
 
-2. **Build:** `npm run build:deploy` (inclui `prisma migrate deploy` + `next build`). Só `npm run build` deixa o SQLite sem tabelas.
+2. **Build:** o painel pode travar em **`npm run build`** — neste repo isso já roda Prisma + migrations + `next build`. Para só o Next (sem migrate), use **`npm run build:next`**.
 
-3. **Start:** `npm start`. Migrations ficam no passo de **build** (`build:deploy`); não rode `prisma migrate` no start se o painel não injetar `DATABASE_URL` na execução (evita **503**).
+3. **Start (painel Hostinger):** `npm run start -- -p $PORT` — recomendação da Hostinger ([deploy-nextjs](https://github.com/hostinger/deploy-nextjs)); evita **503** por porta. Localmente: `npm start`. Migrations entram no **`npm run build`**, não no start.
 
 4. Se o log mostrar **`uv_thread_create`** / **`WorkerThreadsTaskRunner`**, o Node não consegue criar threads no servidor (comum em **hospedagem compartilhada** com Node “Alt”). Use **VPS** ou o produto **Node Web App** da Hostinger — ver a **seção 10** em [DEPLOY-HOSTINGER.md](./DEPLOY-HOSTINGER.md).
 

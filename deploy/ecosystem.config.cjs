@@ -5,7 +5,7 @@
  * Ajuste `cwd` para o caminho real do repositório no servidor.
  * Depois: `pm2 save` e `pm2 startup`.
  *
- * Alternativa com output standalone (após `npm run build:deploy`):
+ * Alternativa com output standalone (após `npm run build`):
  *   script: ".next/standalone/server.js"
  *   env: { NODE_ENV: "production", HOSTNAME: "0.0.0.0", PORT: 3000 }
  */
