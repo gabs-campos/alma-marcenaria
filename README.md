@@ -67,7 +67,7 @@ Resumo:
 
 2. **Build:** `npm run build:deploy` (inclui `prisma migrate deploy` + `next build`). Só `npm run build` deixa o SQLite sem tabelas.
 
-3. **Start:** `npm start` (o script `prestart` roda `prisma migrate deploy` de novo na subida, útil se o painel tiver pulado migrations no build).
+3. **Start:** `npm start`. Migrations ficam no passo de **build** (`build:deploy`); não rode `prisma migrate` no start se o painel não injetar `DATABASE_URL` na execução (evita **503**).
 
 4. Se o log mostrar **`uv_thread_create`** / **`WorkerThreadsTaskRunner`**, o Node não consegue criar threads no servidor (comum em **hospedagem compartilhada** com Node “Alt”). Use **VPS** ou o produto **Node Web App** da Hostinger — ver a **seção 10** em [DEPLOY-HOSTINGER.md](./DEPLOY-HOSTINGER.md).
 

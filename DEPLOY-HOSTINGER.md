@@ -105,7 +105,7 @@ Requer `DATABASE_URL` válido **durante o build** (o `prisma migrate deploy` pre
 
   Defina `PORT` e `HOSTNAME=0.0.0.0` se necessário (VPS atrás do Nginx).
 
-O script `postinstall` roda `prisma generate` após `npm ci` (útil em deploy).
+O `postinstall` roda **apenas** `prisma generate` após `npm ci` (leve). **Não** rode `next build` no `postinstall`: o painel já executa o comando de build; duplicar o build aumenta tempo, memória e risco de falha. As **migrations** ficam no **`npm run build:deploy`** (ou equivalente no build), **não** no `npm start` — ver seção 5 sobre **503**.
 
 ---
 
@@ -118,8 +118,9 @@ O script `postinstall` roda `prisma generate` após `npm ci` (útil em deploy).
 5. **Build:** use **`npm run build:deploy`** (gera o client Prisma, aplica **migrations** e faz o build do Next).  
    Se o painel só tiver um campo e hoje estiver `npm run build`, troque para `npm run build:deploy`.  
    Só `next build` **não** cria as tabelas no SQLite — daí o erro *“A tabela `main.Product` não existe”*.
-6. **Start:** use **`npm start`** (com **npm**, não só `next start`). O projeto define `prestart` → `prisma migrate deploy`, que aplica migrations na subida caso o build tenha pulado esse passo.
+6. **Start:** use **`npm start`**. Não use `prestart` com `prisma migrate deploy` neste projeto: em vários painéis as variáveis de ambiente (**`DATABASE_URL`**) existem só na fase de **build**, não na de **execução**. Se o Prisma rodar no start sem `DATABASE_URL`, o comando falha, o Next **não sobe** e o proxy responde **503**. As migrations devem ser aplicadas no **build** (`build:deploy`).
 7. Confirme se há **armazenamento persistente** para o arquivo SQLite entre deploys.
+8. No painel, se existir opção **“variáveis de ambiente em runtime”** / **produção**, replique **`DATABASE_URL`** (e as demais) para o processo que roda `npm start`, não só para o build.
 
 ### Cloudflare R2 no painel
 
@@ -160,7 +161,8 @@ O script `postinstall` roda `prisma generate` após `npm ci` (útil em deploy).
 | Sintoma | Causa provável | Ação |
 |--------|----------------|------|
 | `Código de erro 14` / não abre o arquivo do banco | `DATABASE_URL` aponta para pasta que **não existe** (ex.: `/var/www/...` na Hostinger Node) | Use `DATABASE_URL=file:./prod.db` e redeploy com `build:deploy` |
-| `A tabela main.Product não existe` | Migrations **nunca** rodaram no `prod.db` (build só com `next build`) | Defina build como `npm run build:deploy` e start como **`npm start`**; faça redeploy. O `prestart` aplica `prisma migrate deploy` automaticamente. |
+| `A tabela main.Product não existe` | Migrations **nunca** rodaram no `prod.db` (build só com `next build`) | Defina build como **`npm run build:deploy`** e redeploy. |
+| **503** / site fora / sem logs de “app” | **`npm start` não chega a subir o Next** — ex.: `prestart` ou script que roda Prisma **sem** `DATABASE_URL` no runtime; ou processo morre ao iniciar | Use **`npm start`** sem hook que exija DB no start; migrations só no **build**. Garanta `DATABASE_URL` (e demais envs) também na fase **runtime**, se o painel separar build de execução. |
 | Login admin não grava cookie | Sem HTTPS em produção | Ative SSL no domínio; `NEXT_PUBLIC_SITE_URL` com `https://` |
 | Upload imagem falha | R2: chaves trocadas ou secret truncado | Gere novo token R2 e copie Access Key + Secret completos |
 | `uv_thread_create` / `WorkerThreadsTaskRunner` / assertion em `node_platform.cc` | Node **não consegue criar threads** no servidor (limite de processo/thread do **hospedagem compartilhada** / CloudLinux `alt-nodejs`) | Ver seção **10** abaixo |
