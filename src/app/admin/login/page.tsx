@@ -1,10 +1,11 @@
 import { AdminLoginClient } from "@/components/admin/AdminLoginClient";
 
-export default function AdminLoginPage({
-  searchParams,
-}: {
-  searchParams: { next?: string };
-}) {
-  return <AdminLoginClient nextPath={searchParams.next} />;
-}
+type Props = {
+  searchParams: Promise<{ next?: string }> | { next?: string };
+};
 
+export default async function AdminLoginPage({ searchParams }: Props) {
+  const resolved =
+    searchParams instanceof Promise ? await searchParams : searchParams;
+  return <AdminLoginClient nextPath={resolved.next} />;
+}

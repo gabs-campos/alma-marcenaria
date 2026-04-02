@@ -164,6 +164,7 @@ O script `postinstall` roda `prisma generate` após `npm ci` (útil em deploy).
 | Login admin não grava cookie | Sem HTTPS em produção | Ative SSL no domínio; `NEXT_PUBLIC_SITE_URL` com `https://` |
 | Upload imagem falha | R2: chaves trocadas ou secret truncado | Gere novo token R2 e copie Access Key + Secret completos |
 | `uv_thread_create` / `WorkerThreadsTaskRunner` / assertion em `node_platform.cc` | Node **não consegue criar threads** no servidor (limite de processo/thread do **hospedagem compartilhada** / CloudLinux `alt-nodejs`) | Ver seção **10** abaixo |
+| Página branca: *Application error* + **Digest** (número) | Exceção no **servidor** ao renderizar (Next.js esconde o stack no browser) | Ver seção **11** abaixo |
 
 ---
 
@@ -201,3 +202,29 @@ e o binário é algo como `/opt/alt/alt-nodejs20/root/bin/node`, isso **não é 
 - “Otimizar” o build: o problema é o **processo Node** no servidor, não o tamanho do bundle.
 
 Se após migrar para **VPS** ou **Node Web App** adequado o mesmo comando (`npm start`) funcionar localmente e em outro provedor, isso confirma limitação do ambiente antigo.
+
+---
+
+## 11. “Application error” + Digest (sem detalhe no navegador)
+
+O Next.js mostra isso quando **alguma rota quebra no servidor** (SSR). O **Digest** é só um id interno para correlacionar com o log do processo Node — **o motivo real está no stderr do servidor**, não na página.
+
+### Por que “não aparecem logs”
+
+Depende do painel: muitos só mostram **build**, não o **runtime** do `npm start`. Procure **Logs da aplicação**, **Runtime**, **STDERR** ou use **SSH** / terminal do app, se existir.
+
+### Causas frequentes neste projeto
+
+1. **`NEXT_PUBLIC_SITE_URL` inválida** — vazia, sem `https://`, ou URL malformada. O layout usa isso em `metadataBase`; valor inválido derruba **todas** as páginas. Use exatamente: `https://mintcream-spoonbill-882631.hostingersite.com` (ajuste ao seu subdomínio).
+
+2. **Prisma / SQLite** — `DATABASE_URL=file:./prod.db`, build com `npm run build:deploy` (migrations), `npm start` com `prestart`. Se o banco não existir ou a tabela não existir, a **home** (`/`) quebra ao listar produtos.
+
+3. **Variáveis de ambiente** — confira no painel todas as chaves de [`.env.example`](.env.example); falta de `DATABASE_URL` em runtime também quebra o Prisma.
+
+### Como depurar
+
+1. No painel Hostinger, abra **tudo** que se chame log (app, Node, deployment, stderr).
+2. Rode localmente com as **mesmas** variáveis de produção: `npm run build:deploy && NODE_ENV=production npm start` e abra a home.
+3. Garanta que o código no Git inclui correções recentes (ex.: `searchParams` assíncrono em `/admin/login`, `metadataBase` tolerante a URL inválida).
+
+Se mesmo assim não houver log, abra ticket na Hostinger pedindo **onde ver stderr do processo Node** em “Node.js Web App”.

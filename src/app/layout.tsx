@@ -5,6 +5,18 @@ import { SiteFooter } from "@/components/SiteFooter";
 import { SiteHeader } from "@/components/SiteHeader";
 import { CartProvider } from "@/context/CartContext";
 
+function metadataBaseUrl(): URL {
+  const raw = process.env.NEXT_PUBLIC_SITE_URL?.trim();
+  if (raw) {
+    try {
+      return new URL(raw);
+    } catch {
+      /* URL inválida ou sem protocolo — evita derrubar o layout em produção */
+    }
+  }
+  return new URL("http://localhost:3000");
+}
+
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
@@ -16,9 +28,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL(
-    process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000",
-  ),
+  metadataBase: metadataBaseUrl(),
   title: {
     default: "Alma Marcenaria",
     template: "%s | Alma Marcenaria",
