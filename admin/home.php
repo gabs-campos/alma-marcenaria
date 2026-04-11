@@ -80,8 +80,8 @@ if (is_post()) {
 
 $home = fetch_home_content();
 ?>
-<h1>Editar página inicial</h1>
-<form method="post" enctype="multipart/form-data" class="checkout-form" style="max-width:900px;">
+<h1 class="reveal">Editar página inicial</h1>
+<form method="post" enctype="multipart/form-data" class="checkout-form reveal" style="max-width:900px;">
   <?= csrf_input() ?>
   <label>Eyebrow da Home
     <input type="text" name="hero_eyebrow" maxlength="190" value="<?= e($home['hero_eyebrow']) ?>" required>

@@ -4,9 +4,9 @@ require_once __DIR__ . '/_header.php';
 
 $orders = db()->query('SELECT * FROM orders ORDER BY created_at DESC')->fetchAll();
 ?>
-<h1>Pedidos</h1>
+<h1 class="reveal">Pedidos</h1>
 <?php if ($orders === []): ?>
-  <p>Nenhum pedido registrado ainda.</p>
+  <p class="reveal">Nenhum pedido registrado ainda.</p>
 <?php else: ?>
   <?php foreach ($orders as $order): ?>
     <?php
@@ -18,7 +18,7 @@ $orders = db()->query('SELECT * FROM orders ORDER BY created_at DESC')->fetchAll
     $stmt->execute([(int) $order['id']]);
     $items = $stmt->fetchAll();
     ?>
-    <article class="card" style="margin-bottom:12px;">
+    <article class="card reveal" style="margin-bottom:12px;">
       <h3>Pedido #<?= (int) $order['id'] ?> - <?= e($order['customer_name']) ?></h3>
       <p><strong>Email:</strong> <?= e($order['customer_email']) ?> | <strong>Telefone:</strong> <?= e($order['customer_phone']) ?></p>
       <p><strong>Observações:</strong> <?= nl2br(e($order['notes'])) ?></p>

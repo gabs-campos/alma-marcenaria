@@ -41,8 +41,8 @@ if (is_post()) {
 
 $about = fetch_about_content();
 ?>
-<h1>Editar "Quem Somos"</h1>
-<form method="post" enctype="multipart/form-data" class="checkout-form" style="max-width:760px;">
+<h1 class="reveal">Editar "Quem Somos"</h1>
+<form method="post" enctype="multipart/form-data" class="checkout-form reveal" style="max-width:760px;">
   <?= csrf_input() ?>
   <label>Texto institucional
     <textarea name="content" rows="10" required><?= e($about['content'] ?? '') ?></textarea>

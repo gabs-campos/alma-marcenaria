@@ -174,7 +174,7 @@ $whatsappUrl = 'https://wa.me/5511948121301?text=' . rawurlencode($whatsappMessa
   <title>Alma Marcenaria</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,600;0,700;1,600&family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/public/assets/styles.css">
 </head>
 <body>
@@ -202,7 +202,7 @@ $whatsappUrl = 'https://wa.me/5511948121301?text=' . rawurlencode($whatsappMessa
     <?php endforeach; ?>
 
     <?php if ($page === 'home'): ?>
-      <section class="hero">
+      <section class="hero reveal">
         <div>
           <p class="eyebrow"><?= e($home['hero_eyebrow']) ?></p>
           <h1><?= e($home['hero_title']) ?></h1>
@@ -221,50 +221,68 @@ $whatsappUrl = 'https://wa.me/5511948121301?text=' . rawurlencode($whatsappMessa
         </div>
       </section>
       <section class="grid-3">
-        <article class="card"><h3><?= e($home['feature_1_title']) ?></h3><p><?= e($home['feature_1_description']) ?></p></article>
-        <article class="card"><h3><?= e($home['feature_2_title']) ?></h3><p><?= e($home['feature_2_description']) ?></p></article>
-        <article class="card"><h3><?= e($home['feature_3_title']) ?></h3><p><?= e($home['feature_3_description']) ?></p></article>
+        <article class="card reveal"><h3><?= e($home['feature_1_title']) ?></h3><p><?= e($home['feature_1_description']) ?></p></article>
+        <article class="card reveal"><h3><?= e($home['feature_2_title']) ?></h3><p><?= e($home['feature_2_description']) ?></p></article>
+        <article class="card reveal"><h3><?= e($home['feature_3_title']) ?></h3><p><?= e($home['feature_3_description']) ?></p></article>
       </section>
     <?php endif; ?>
 
     <?php if ($page === 'shop'): ?>
       <?php
       $category = trim((string) ($_GET['category'] ?? ''));
+      $categories = fetch_categories();
+
       if ($category !== '') {
-          $stmt = db()->prepare('SELECT * FROM products WHERE category = ? ORDER BY created_at DESC');
+          $stmt = db()->prepare(
+              'SELECT p.*, c.name AS category_name, c.slug AS category_slug, pi.image_path AS cover_image
+               FROM products p
+               INNER JOIN categories c ON c.id = p.category_id
+               LEFT JOIN product_images pi ON pi.product_id = p.id AND pi.sort_order = 1
+               WHERE c.slug = ?
+               ORDER BY p.created_at DESC'
+          );
           $stmt->execute([$category]);
       } else {
-          $stmt = db()->query('SELECT * FROM products ORDER BY created_at DESC');
+          $stmt = db()->query(
+              'SELECT p.*, c.name AS category_name, c.slug AS category_slug, pi.image_path AS cover_image
+               FROM products p
+               INNER JOIN categories c ON c.id = p.category_id
+               LEFT JOIN product_images pi ON pi.product_id = p.id AND pi.sort_order = 1
+               ORDER BY p.created_at DESC'
+          );
       }
       $products = $stmt->fetchAll();
       ?>
-      <section class="section-head">
+      <section class="section-head reveal">
         <h2>Loja</h2>
         <form method="get" class="inline-form">
           <input type="hidden" name="page" value="shop">
           <select name="category">
             <option value="">Todas as categorias</option>
-            <option value="sob-medida" <?= $category === 'sob-medida' ? 'selected' : '' ?>>Sob medida</option>
-            <option value="pronta-entrega" <?= $category === 'pronta-entrega' ? 'selected' : '' ?>>Pronta entrega</option>
+            <?php foreach ($categories as $categoryOption): ?>
+              <option value="<?= e($categoryOption['slug']) ?>" <?= $category === $categoryOption['slug'] ? 'selected' : '' ?>>
+                <?= e($categoryOption['name']) ?>
+              </option>
+            <?php endforeach; ?>
           </select>
           <button class="btn btn-sm" type="submit">Filtrar</button>
         </form>
       </section>
-      <section class="grid-3">
+      <section class="grid-3 shop-grid">
         <?php foreach ($products as $product): ?>
-          <?php
-          $catLabel = ($product['category'] ?? '') === 'pronta-entrega' ? 'Pronta entrega' : 'Móveis';
-          ?>
-          <article class="product-card">
+          <article class="product-card reveal">
             <div class="product-card-media">
-              <?php if (!empty($product['image'])): ?>
-                <img src="/uploads/<?= e($product['image']) ?>" alt="<?= e($product['name']) ?>">
+              <?php
+              $coverImage = $product['cover_image'] ?? $product['image'] ?? null;
+              ?>
+              <?php if (!empty($coverImage)): ?>
+                <img src="/uploads/<?= e((string) $coverImage) ?>" alt="<?= e($product['name']) ?>">
               <?php else: ?>
                 <div class="product-card-placeholder">Sem imagem</div>
               <?php endif; ?>
             </div>
             <div class="product-card-body">
-              <span class="product-card-category"><?= e($catLabel) ?></span>
+              <span class="product-card-category"><?= e($product['category_name'] ?? 'Categoria') ?></span>
               <h3><?= e($product['name']) ?></h3>
               <p><?= e($product['description']) ?></p>
               <div class="product-card-footer">
@@ -289,20 +307,56 @@ $whatsappUrl = 'https://wa.me/5511948121301?text=' . rawurlencode($whatsappMessa
     <?php if ($page === 'product'): ?>
       <?php
       $id = (int) ($_GET['id'] ?? 0);
-      $stmt = db()->prepare('SELECT * FROM products WHERE id = ? LIMIT 1');
+      $stmt = db()->prepare(
+          'SELECT p.*, c.name AS category_name, c.slug AS category_slug
+           FROM products p
+           LEFT JOIN categories c ON c.id = p.category_id
+           WHERE p.id = ? LIMIT 1'
+      );
       $stmt->execute([$id]);
       $product = $stmt->fetch();
+      $productImages = $product ? fetch_product_images((int) $product['id']) : [];
+      if ($product && $productImages === [] && !empty($product['image'])) {
+          $productImages[] = [
+              'id' => 0,
+              'image_path' => $product['image'],
+              'sort_order' => 1,
+          ];
+      }
       ?>
       <?php if (!$product): ?>
-        <p>Produto não encontrado.</p>
+        <p class="reveal">Produto não encontrado.</p>
       <?php else: ?>
         <section class="product-detail">
-          <div>
-            <?php if (!empty($product['image'])): ?>
-              <img src="/uploads/<?= e($product['image']) ?>" alt="<?= e($product['name']) ?>">
+          <div class="reveal">
+            <?php if ($productImages !== []): ?>
+              <?php
+              $mainImage = (string) $productImages[0]['image_path'];
+              ?>
+              <div class="product-gallery" data-gallery>
+                <img class="product-gallery-main" src="/uploads/<?= e($mainImage) ?>" alt="<?= e($product['name']) ?>" data-gallery-main>
+                <?php if (count($productImages) > 1): ?>
+                  <div class="product-gallery-thumbs">
+                    <?php foreach ($productImages as $index => $image): ?>
+                      <button
+                        type="button"
+                        class="product-gallery-thumb<?= $index === 0 ? ' is-active' : '' ?>"
+                        data-gallery-thumb
+                        data-image-src="/uploads/<?= e($image['image_path']) ?>"
+                        aria-label="Ver imagem <?= $index + 1 ?>"
+                      >
+                        <img src="/uploads/<?= e($image['image_path']) ?>" alt="<?= e($product['name']) ?>">
+                      </button>
+                    <?php endforeach; ?>
+                  </div>
+                <?php endif; ?>
+              </div>
+            <?php else: ?>
+              <div class="product-card-placeholder">Sem imagem</div>
             <?php endif; ?>
           </div>
-          <div>
+          <div class="reveal">
+            <p class="eyebrow" style="margin-bottom:8px;"><?= e($product['category_name'] ?? 'Categoria') ?></p>
             <h2><?= e($product['name']) ?></h2>
             <p><?= nl2br(e($product['description'])) ?></p>
             <p class="price"><?= money_br((float) $product['price']) ?></p>
@@ -331,11 +385,11 @@ $whatsappUrl = 'https://wa.me/5511948121301?text=' . rawurlencode($whatsappMessa
       }
       $total = 0.0;
       ?>
-      <h2>Carrinho</h2>
+      <h2 class="reveal">Carrinho</h2>
       <?php if ($products === []): ?>
-        <p>Seu carrinho está vazio.</p>
+        <p class="reveal">Seu carrinho está vazio.</p>
       <?php else: ?>
-        <form method="post">
+        <form method="post" class="reveal">
           <?= csrf_input() ?>
           <input type="hidden" name="action" value="update_cart">
           <table class="table">
@@ -359,9 +413,9 @@ $whatsappUrl = 'https://wa.me/5511948121301?text=' . rawurlencode($whatsappMessa
           <button class="btn btn-sm" type="submit">Atualizar carrinho</button>
         </form>
 
-        <h3>Total: <?= money_br($total) ?></h3>
-        <h3>Finalizar pedido</h3>
-        <form method="post" class="checkout-form">
+        <h3 class="reveal">Total: <?= money_br($total) ?></h3>
+        <h3 class="reveal">Finalizar pedido</h3>
+        <form method="post" class="checkout-form reveal">
           <?= csrf_input() ?>
           <input type="hidden" name="action" value="checkout">
           <label>Nome <input type="text" name="customer_name" required></label>
@@ -376,11 +430,11 @@ $whatsappUrl = 'https://wa.me/5511948121301?text=' . rawurlencode($whatsappMessa
     <?php if ($page === 'about'): ?>
       <?php $about = fetch_about_content(); ?>
       <section class="about-wrap">
-        <div>
+        <div class="reveal">
           <h2>Quem Somos</h2>
           <p><?= nl2br(e($about['content'])) ?></p>
         </div>
-        <div>
+        <div class="reveal">
           <?php if (!empty($about['image'])): ?>
             <img src="/uploads/<?= e($about['image']) ?>" alt="Equipe Alma Marcenaria">
           <?php endif; ?>
@@ -389,8 +443,8 @@ $whatsappUrl = 'https://wa.me/5511948121301?text=' . rawurlencode($whatsappMessa
     <?php endif; ?>
 
     <?php if ($page === 'contact'): ?>
-      <h2>Contato</h2>
-      <form method="post" class="checkout-form">
+      <h2 class="reveal">Contato</h2>
+      <form method="post" class="checkout-form reveal">
         <?= csrf_input() ?>
         <input type="hidden" name="action" value="contact_form">
         <label>Nome <input type="text" name="name" required></label>
@@ -414,7 +468,7 @@ $whatsappUrl = 'https://wa.me/5511948121301?text=' . rawurlencode($whatsappMessa
           <a href="<?= e($whatsappUrl) ?>" target="_blank" rel="noopener noreferrer">Contato</a>
         </div>
         <div class="footer-social" aria-label="Redes sociais">
-          <a href="https://instagram.com" target="_blank" rel="noopener noreferrer" aria-label="Instagram">
+          <a href="https://www.instagram.com/alma.marcenaria/" target="_blank" rel="noopener noreferrer" aria-label="Instagram">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
               <rect x="3.5" y="3.5" width="17" height="17" rx="5"></rect>
               <circle cx="12" cy="12" r="4"></circle>
@@ -432,56 +486,6 @@ $whatsappUrl = 'https://wa.me/5511948121301?text=' . rawurlencode($whatsappMessa
       </div>
     </div>
   </footer>
-  <script>
-    // #region agent log
-    (function () {
-      const payloadBase = {
-        sessionId: '07cc42',
-        runId: 'css-debug-1',
-        timestamp: Date.now()
-      };
-      const cssLink = document.querySelector('link[rel="stylesheet"]');
-      fetch('http://127.0.0.1:7425/ingest/933f4810-a097-4818-93f2-9bd0750b0e00', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Debug-Session-Id': '07cc42'
-        },
-        body: JSON.stringify({
-          ...payloadBase,
-          hypothesisId: 'H_APP_RENDERED',
-          location: 'public/index.php:footer-script-1',
-          message: 'Runtime probe executed',
-          data: {
-            href: window.location.href,
-            hasStylesheetLink: !!cssLink,
-            stylesheetHref: cssLink ? cssLink.getAttribute('href') : null
-          }
-        })
-      }).catch(() => {});
-
-      window.addEventListener('load', function () {
-        const bodyBg = window.getComputedStyle(document.body).backgroundColor;
-        fetch('http://127.0.0.1:7425/ingest/933f4810-a097-4818-93f2-9bd0750b0e00', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Debug-Session-Id': '07cc42'
-          },
-          body: JSON.stringify({
-            ...payloadBase,
-            hypothesisId: 'H_CSS_APPLIED',
-            location: 'public/index.php:footer-script-2',
-            message: 'Post-load style probe',
-            data: {
-              bodyBackgroundColor: bodyBg,
-              isBodyBgNotDefaultWhite: bodyBg !== 'rgba(0, 0, 0, 0)' && bodyBg !== 'rgb(255, 255, 255)'
-            }
-          })
-        }).catch(() => {});
-      });
-    })();
-    // #endregion
-  </script>
+  <script src="/public/assets/site.js" defer></script>
 </body>
 </html>

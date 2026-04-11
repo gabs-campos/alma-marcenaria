@@ -38,9 +38,9 @@ if (is_post()) {
 
 $users = db()->query('SELECT id, email, created_at FROM users ORDER BY created_at DESC')->fetchAll();
 ?>
-<h1>Administradores</h1>
+<h1 class="reveal">Administradores</h1>
 
-<form method="post" class="checkout-form" style="max-width:760px;">
+<form method="post" class="checkout-form reveal" style="max-width:760px;">
   <?= csrf_input() ?>
   <label>Email do novo administrador
     <input type="email" name="email" required>
@@ -51,7 +51,7 @@ $users = db()->query('SELECT id, email, created_at FROM users ORDER BY created_a
   <button class="btn" type="submit">Criar administrador</button>
 </form>
 
-<table class="table" style="margin-top:18px;">
+<table class="table reveal" style="margin-top:18px;">
   <thead>
     <tr>
       <th>ID</th>

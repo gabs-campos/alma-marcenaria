@@ -5,15 +5,35 @@ CREATE TABLE IF NOT EXISTS users (
   created_at DATETIME NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+CREATE TABLE IF NOT EXISTS categories (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  name VARCHAR(120) NOT NULL,
+  slug VARCHAR(120) NOT NULL UNIQUE,
+  created_at DATETIME NOT NULL,
+  updated_at DATETIME NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 CREATE TABLE IF NOT EXISTS products (
   id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   name VARCHAR(150) NOT NULL,
   description TEXT NULL,
   price DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+  category_id INT UNSIGNED NOT NULL,
   category VARCHAR(80) NOT NULL DEFAULT 'sob-medida',
   image VARCHAR(255) NULL,
   created_at DATETIME NOT NULL,
-  updated_at DATETIME NOT NULL
+  updated_at DATETIME NOT NULL,
+  CONSTRAINT fk_products_category FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS product_images (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  product_id INT UNSIGNED NOT NULL,
+  image_path VARCHAR(255) NOT NULL,
+  sort_order TINYINT UNSIGNED NOT NULL,
+  created_at DATETIME NOT NULL,
+  CONSTRAINT fk_product_images_product FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
+  CONSTRAINT uq_product_images_slot UNIQUE (product_id, sort_order)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS orders (
@@ -61,6 +81,14 @@ CREATE TABLE IF NOT EXISTS home_content (
 INSERT INTO about (content, image, updated_at)
 SELECT 'A Alma Marcenaria cria móveis autorais com foco em funcionalidade, estética e durabilidade.', NULL, NOW()
 WHERE NOT EXISTS (SELECT 1 FROM about);
+
+INSERT INTO categories (name, slug, created_at, updated_at)
+SELECT 'Sob medida', 'sob-medida', NOW(), NOW()
+WHERE NOT EXISTS (SELECT 1 FROM categories WHERE slug = 'sob-medida');
+
+INSERT INTO categories (name, slug, created_at, updated_at)
+SELECT 'Pronta entrega', 'pronta-entrega', NOW(), NOW()
+WHERE NOT EXISTS (SELECT 1 FROM categories WHERE slug = 'pronta-entrega');
 
 INSERT INTO home_content (
   hero_eyebrow,

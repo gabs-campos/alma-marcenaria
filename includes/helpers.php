@@ -191,3 +191,57 @@ function store_uploaded_image(array $file): ?string
 
     return $subDir . '/' . $safeName;
 }
+
+function slugify(string $value): string
+{
+    $value = trim($value);
+    if ($value === '') {
+        return '';
+    }
+
+    $normalized = iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $value);
+    if ($normalized === false) {
+        $normalized = $value;
+    }
+
+    $slug = strtolower((string) preg_replace('/[^a-zA-Z0-9]+/', '-', $normalized));
+    $slug = trim($slug, '-');
+    return $slug;
+}
+
+function fetch_categories(): array
+{
+    return db()->query('SELECT id, name, slug FROM categories ORDER BY name ASC')->fetchAll();
+}
+
+function fetch_product_images(int $productId): array
+{
+    $stmt = db()->prepare('SELECT id, image_path, sort_order FROM product_images WHERE product_id = ? ORDER BY sort_order ASC, id ASC');
+    $stmt->execute([$productId]);
+    return $stmt->fetchAll();
+}
+
+function fetch_product_images_map(array $productIds): array
+{
+    if ($productIds === []) {
+        return [];
+    }
+
+    $productIds = array_values(array_unique(array_map(static fn ($id): int => (int) $id, $productIds)));
+    $placeholders = implode(',', array_fill(0, count($productIds), '?'));
+    $stmt = db()->prepare(
+        "SELECT id, product_id, image_path, sort_order FROM product_images WHERE product_id IN ($placeholders) ORDER BY product_id ASC, sort_order ASC, id ASC"
+    );
+    $stmt->execute($productIds);
+
+    $byProduct = [];
+    foreach ($stmt->fetchAll() as $row) {
+        $productId = (int) $row['product_id'];
+        if (!isset($byProduct[$productId])) {
+            $byProduct[$productId] = [];
+        }
+        $byProduct[$productId][] = $row;
+    }
+
+    return $byProduct;
+}

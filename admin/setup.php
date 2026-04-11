@@ -39,20 +39,24 @@ $messages = consume_flash();
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Setup Admin</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,600;0,700;1,600&family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/public/assets/styles.css">
 </head>
-<body>
+<body class="admin">
   <main class="container" style="max-width:560px;padding-top:60px;">
-    <h1>Setup inicial do admin</h1>
+    <h1 class="reveal">Setup inicial do admin</h1>
     <?php foreach ($messages as $msg): ?>
       <div class="alert alert-<?= e($msg['type']) ?>"><?= e($msg['message']) ?></div>
     <?php endforeach; ?>
-    <form method="post" class="checkout-form">
+    <form method="post" class="checkout-form reveal">
       <?= csrf_input() ?>
       <label>Email admin <input type="email" name="email" required></label>
       <label>Senha admin <input type="password" name="password" minlength="8" required></label>
       <button class="btn" type="submit">Criar usuário</button>
     </form>
   </main>
+  <script src="/public/assets/site.js" defer></script>
 </body>
 </html>
