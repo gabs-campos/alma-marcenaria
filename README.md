@@ -1,77 +1,63 @@
-# Alma Marcenaria
+# Alma Marcenaria Website
 
-Site (frontend) + API (backend) em um único projeto Next.js (App Router), com foco em **performance** e **SEO**. Inclui loja, carrinho/checkout e um **Admin** simples para CRUD de produtos (Prisma + SQLite).
+Website institucional + loja leve com carrinho e painel administrativo em PHP 8 + MySQL.
 
-## Stack
+## Estrutura
 
-- **Next.js (App Router)**: páginas e rotas em `src/app`
-- **Tailwind CSS v4**: estilos em `src/app/globals.css` + `tailwind.config.ts`
-- **Prisma + SQLite**: schema em `prisma/schema.prisma`
+- `public/`: páginas públicas (Home, Loja, Carrinho, Quem Somos, Contato)
+- `admin/`: painel administrativo (login, CRUD de produtos, pedidos, conteúdo institucional)
+- `includes/`: bootstrap, conexão DB, helpers, auth, CSRF e email
+- `config/`: configurações de app, banco e email
+- `uploads/`: imagens enviadas via admin
+- `schema.sql`: estrutura do banco de dados
 
-## Rodando localmente
+## Deploy rápido na Hostinger
 
-1) Instale dependências:
+1. Crie banco MySQL no painel Hostinger.
+2. Importe o arquivo `schema.sql` no phpMyAdmin.
+3. Ajuste credenciais em `config/config.php` (db e email).
+4. Publique os arquivos no servidor.
+5. Acesse `/admin/setup.php` para criar o primeiro usuário admin.
+6. Faça login em `/admin/index.php`.
 
-```bash
-npm install
-```
+## Deploy e migration automáticos
 
-2) Crie o `.env` (use o exemplo):
+Scripts adicionados:
 
-```bash
-cp .env.example .env
-```
+- `scripts/deploy.sh`: executa migrations e faz upload FTP.
+- `scripts/migrate.php`: aplica arquivos SQL de `migrations/`.
+- `config/deploy.env`: variáveis de FTP e banco para deploy.
 
-3) Rode migrations e gere o client do Prisma (na raiz do projeto):
+### Pré-requisitos locais
 
-```bash
-npx prisma migrate deploy
-npx prisma generate
-```
+- PHP 8+
+- `lftp` instalado (macOS: `brew install lftp`)
 
-Com `DATABASE_URL="file:./dev.db"` no `.env`, o arquivo SQLite fica em **`prisma/dev.db`** (caminhos relativos são em relação à pasta `prisma/`). Se aparecer erro de tabela inexistente no admin, rode de novo `npx prisma migrate deploy`.
+### Como usar
 
-4) Inicie o servidor:
+1. Confira as credenciais em `config/deploy.env`.
+2. Torne o script executável:
+   - `chmod +x scripts/deploy.sh`
+3. Rode o deploy:
+   - `./scripts/deploy.sh`
 
-```bash
-npm run dev
-```
+Comportamento padrão:
 
-Abra `http://localhost:3000`.
+- Roda migrations pendentes antes do upload.
+- Faz upload via FTP para `public_html`.
+- Não remove arquivos remotos extras (modo seguro).
 
-## Admin (login simples)
+Flags úteis:
 
-- Acesse `"/admin/login"`.
-- Credenciais via `.env`:
-  - `ADMIN_USERNAME`
-  - `ADMIN_PASSWORD`
+- `DELETE_REMOTE=1 ./scripts/deploy.sh`
+  - Remove no servidor arquivos que não existem localmente.
+- `RUN_MIGRATIONS=0 ./scripts/deploy.sh`
+  - Faz só upload, sem migration.
 
-As rotas de escrita do CRUD de produtos (`POST/PATCH/DELETE`) exigem autenticação (cookie de admin) e podem opcionalmente exigir token:
+## Segurança implementada
 
-- `ADMIN_API_TOKEN` (se preenchido): envie `Authorization: Bearer <ADMIN_API_TOKEN>`
-
-## Estrutura de diretórios
-
-- `src/app`: páginas (Home, Loja, Carrinho, Checkout, Institucional) e Admin
-- `src/app/api`: rotas de API (`/api/products`, `/api/shipping`, `/api/checkout`, `/api/admin/*`)
-- `src/components`: componentes de UI
-- `prisma/`: schema e migrations
-
-## Deploy na Hostinger (Node)
-
-Guia detalhado: [DEPLOY-HOSTINGER.md](./DEPLOY-HOSTINGER.md).
-
-Resumo:
-
-1. Variáveis no painel: `DATABASE_URL=file:./prod.db` (produção na Hostinger), `NEXT_PUBLIC_SITE_URL` com `https://`, admin e R2 — ver [`.env.example`](./.env.example).
-
-2. **Build:** o painel pode travar em **`npm run build`** — neste repo isso já roda Prisma + migrations + `next build`. Para só o Next (sem migrate), use **`npm run build:next`**.
-
-3. **Start (painel Hostinger):** `npm run start -- -p $PORT` — recomendação da Hostinger ([deploy-nextjs](https://github.com/hostinger/deploy-nextjs)); evita **503** por porta. Localmente: `npm start`. Migrations entram no **`npm run build`**, não no start.
-
-4. Se o log mostrar **`uv_thread_create`** / **`WorkerThreadsTaskRunner`**, o Node não consegue criar threads no servidor (comum em **hospedagem compartilhada** com Node “Alt”). Use **VPS** ou o produto **Node Web App** da Hostinger — ver a **seção 10** em [DEPLOY-HOSTINGER.md](./DEPLOY-HOSTINGER.md).
-
-## Notas
-
-- `/.env*` é ignorado pelo git por padrão (veja `.gitignore`).
-- Rotas SEO: `src/app/sitemap.ts` e `src/app/robots.ts`.
+- Senha admin com `password_hash` (bcrypt).
+- Sessão para autenticação do painel admin.
+- Tokens CSRF em formulários críticos.
+- Prepared statements com PDO em queries.
+- Validação básica de upload (tipo e tamanho) e bloqueio de execução PHP em `uploads/`.
